@@ -1,28 +1,36 @@
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 
-import cv2
+from fastapi import FastAPI, File, HTTPException, UploadFile
 
-# impoortnatntt
-video_path = r"..\15Seconds-DEMO.mp4"
-output_dir = Path("frames")
+import frame_extract
 
-output_dir.mkdir(parents=True, exist_ok=True)
-capture = cv2.VideoCapture(video_path)
-if not capture.isOpened():
-	raise RuntimeError(f"Could not open video: {video_path}")
 
-frame_index = 0
-try:
-	while True:
-		success, frame = capture.read()
-		if not success:
-			break
+app = FastAPI()
 
-		frame_path = output_dir / f"frame_{frame_index:06d}.jpg"
-		if not cv2.imwrite(str(frame_path), frame):
-			raise RuntimeError(f"Could not save frame: {frame_path}")
-		frame_index += 1
-finally:
-	capture.release()
+VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv", ".webm", ".mpeg", ".mpg"}
 
-print(f"Extracted {frame_index} frames to {output_dir}")
+
+@app.post("/video")
+async def upload_video(file: UploadFile = File(...)):
+	suffix = Path(file.filename or "").suffix.lower()
+	if suffix not in VIDEO_EXTENSIONS:
+		raise HTTPException(status_code=400, detail="Unsupported video file type")
+
+	temporary_path = None
+	try:
+		with NamedTemporaryFile(suffix=suffix, delete=False) as temporary_file:
+			temporary_path = Path(temporary_file.name)
+			while chunk := await file.read(1024 * 1024):
+				temporary_file.write(chunk)
+
+		frames = frame_extract.extract_frames(str(temporary_path))
+		return {"frames": frames}
+	except HTTPException:
+		raise
+	except Exception as exc:
+		raise HTTPException(status_code=500, detail="Video processing failed") from exc
+	finally:
+		await file.close()
+		if temporary_path is not None:
+			temporary_path.unlink(missing_ok=True)
