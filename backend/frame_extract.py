@@ -2,7 +2,7 @@ import uuid
 from pathlib import Path
 import cv2
 
-samplesTaken = 4
+samplesTaken = 6
 
 # base dir for all the frames
 FRAMES_BASE_DIR = Path("static/frames")

@@ -67,7 +67,7 @@ function App() {
               name="file" 
               accept="video/*" 
               className="hidden" 
-              onChange={handleFileChange} 
+              onChange={handleFileChange}
             />
           </label>
 
