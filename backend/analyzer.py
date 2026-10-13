@@ -1,5 +1,6 @@
-MATCH_MAX = 10   # <= this: same picture (compression noise)
-TAMPER_MIN = 12  # > this: visually changed
+MATCH_MAX = 10      # <= this: same picture (compression noise)
+TAMPER_MIN = 12     # > this: visually changed
+UNRELATED_MIN = 20  # avg bits apart; above this it's a different video
 
 
 def best_alignment(orig, cand):
@@ -17,14 +18,31 @@ def best_alignment(orig, cand):
     return best
 
 
+def not_registered(avg, message):
+    return {
+        "verdict": "not_registered",
+        "avg_distance": avg,
+        "overall_similarity": round(max(0.0, 100 - (avg / 64) * 100), 1),
+        "is_authentic": False,
+        "alterations": {},
+        "frames": [],
+        "message": message,
+    }
+
+
 def compare(orig_meta, orig, cand_meta, cand):
     best = best_alignment(orig, cand)
     if best is None:
-        return {"overall_similarity": 0, "is_authentic": False, "frames": [],
-                "alterations": {"visually_altered": {"detected": True, "flagged_timestamps": [],
-                                "details": "Not enough overlap with the registered video."}}}
+        return not_registered(64, "Not enough overlap with the registered video.")
 
     avg, pairs = best
+    matched_frac = sum(a["hash"] - b["hash"] <= MATCH_MAX for a, b in pairs) / len(pairs)
+    if avg > UNRELATED_MIN or matched_frac < 0.3:
+        return not_registered(
+            avg,
+            "This doesn't match any registered original. It may be unregistered, or too heavily edited to link.",
+        )
+
     frames = []
     for a, b in pairs:
         d = a["hash"] - b["hash"]
@@ -45,10 +63,13 @@ def compare(orig_meta, orig, cand_meta, cand):
     quality_altered = o_res != c_res
 
     similarity = round(max(0.0, 100 - (avg / 64) * 100), 1)
+    is_authentic = not flagged and not time_altered
 
     return {
+        "verdict": "authentic" if is_authentic else "altered",
+        "avg_distance": avg,
         "overall_similarity": similarity,
-        "is_authentic": not flagged and not time_altered,
+        "is_authentic": is_authentic,
         "alterations": {
             "visually_altered": {
                 "detected": bool(flagged),

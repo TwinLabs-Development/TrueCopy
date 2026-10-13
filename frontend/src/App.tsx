@@ -53,13 +53,13 @@ function App() {
 
   return (
     <div className="flex flex-col justify-center items-center min-h-screen gap-4 p-4">
-      <div className="text-center">
+      <header className="text-center">
         <h1 className="font-bold text-4xl">TrueCopy</h1>
         <p className="mt-2 text-gray-500">Motto in progress idk ginagawa palang</p>
-      </div>
+      </header>
 
       <div>
-        <form className="flex flex-col items-center gap-4" onSubmit={handleSubmit}>
+        <form className="flex flex-row items-center gap-4" onSubmit={handleSubmit}>
           <label className="cursor-pointer rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
             <span>Browse File</span>
             <input 
