@@ -2,12 +2,12 @@ import './index.css';
 import { useState } from 'react';
 
 function App() {
-  const [selectedFile, setSelectedFile] = useState(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState('');
-  const [frames, setFrames] = useState([]);
+  const [frames, setFrames] = useState<string[]>([]);
 
-  const handleFileChange = (e) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       setSelectedFile(e.target.files[0]);
       setUploadStatus('');
@@ -15,7 +15,7 @@ function App() {
     }
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e : React.FormEvent) => {
     e.preventDefault();
 
     if (!selectedFile) {
@@ -91,7 +91,6 @@ function App() {
         </form>
       </div>
 
-      {/* Renders the extracted frames from the server */}
       {frames.length > 0 && (
         <div className="grid grid-cols-3 gap-3 max-w-2xl mt-4">
           {frames.map((framePath, i) => (
