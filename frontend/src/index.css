@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
 body {
-    background-color: beige;
+    background-color: #ececec;
+}
+
+@theme {
+    --color-wallahi: #ececec;
+    --color-speed: #5b4837;
 }
