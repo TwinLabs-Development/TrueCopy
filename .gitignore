@@ -149,3 +149,5 @@ vite.config.ts.timestamp-*
 .turbo
 
 backend/frames
+backend/static/frames
+backend/__pycache__
