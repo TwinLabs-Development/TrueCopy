@@ -9,10 +9,159 @@ type BodyProps = {
   setIsUploading: (value: boolean) => void;
 };
 
+type Alteration = {
+  detected: boolean;
+  details: string;
+  flagged_timestamps?: string[];
+};
+
+type Frame = {
+  timestamp_sec: number;
+  distance: number;
+  matched: boolean;
+  frame_url: string;
+};
+
+type ApiResult = {
+  status?: string;
+  record_id?: string;
+  exact_match?: boolean;
+  verdict?: "authentic" | "altered" | "not_registered";
+  overall_similarity?: number;
+  avg_distance?: number;
+  is_authentic?: boolean;
+  message?: string;
+  total_frames_sampled?: number;
+  alterations?: {
+    visually_altered?: Alteration;
+    time_altered?: Alteration;
+    quality_altered?: Alteration;
+    audio_altered?: Alteration;
+  };
+  frames?: Frame[];
+};
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex flex-col items-center rounded-lg bg-beige1 p-4">
+      <span className="text-xs text-beige5/80">{label}</span>
+      <span className="text-2xl font-bold text-beige5">{value}</span>
+    </div>
+  );
+}
+
+function getHeadline(r: ApiResult): { text: string; color: string } {
+  if (r.status) return { text: r.status, color: "text-beige5" };
+  if (r.exact_match) return { text: "Exact match", color: "text-green-700" };
+  switch (r.verdict) {
+    case "authentic":
+      return { text: "Authentic", color: "text-green-700" };
+    case "altered":
+      return { text: "Altered", color: "text-red-700" };
+    case "not_registered":
+      return { text: "Not registered", color: "text-beige5" };
+    default:
+      return { text: "Result", color: "text-beige5" };
+  }
+}
+
+function AlterationRow({
+  label,
+  item,
+  notChecked = false,
+}: {
+  label: string;
+  item?: Alteration;
+  notChecked?: boolean;
+}) {
+  if (!item) return null;
+
+  const badge = notChecked
+    ? { text: "Not checked", color: "text-beige5/60" }
+    : item.detected
+      ? { text: "Detected", color: "text-red-700" }
+      : { text: "Clear", color: "text-green-700" };
+
+  return (
+    <div className="flex flex-col gap-1 rounded-lg bg-beige1 p-4 text-left">
+      <div className="flex items-center justify-between">
+        <span className="font-semibold text-beige5">{label}</span>
+        <span className={`text-sm font-semibold ${badge.color}`}>{badge.text}</span>
+      </div>
+      <p className="text-sm text-beige5/80">{item.details}</p>
+    </div>
+  );
+}
+
+function ResultCard({ result }: { result: ApiResult }) {
+  const headline = getHeadline(result);
+  const frames = result.frames ?? [];
+  const matchedCount = frames.filter((f) => f.matched).length;
+
+  return (
+    <div className="flex flex-col gap-4 rounded-xl bg-gray1 border-[0.3rem] border-gray2 border-dashed p-6">
+      <h3 className={`text-3xl font-semibold italic ${headline.color}`}>
+        {headline.text}
+      </h3>
+
+      {result.message && <p className="text-beige5">{result.message}</p>}
+
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        {result.overall_similarity !== undefined && (
+          <Stat label="Similarity" value={`${result.overall_similarity}%`} />
+        )}
+        {result.avg_distance !== undefined && (
+          <Stat label="Avg distance" value={result.avg_distance.toFixed(2)} />
+        )}
+        {result.total_frames_sampled !== undefined && (
+          <Stat label="Frames sampled" value={String(result.total_frames_sampled)} />
+        )}
+        {frames.length > 0 && (
+          <Stat label="Frames matched" value={`${matchedCount} / ${frames.length}`} />
+        )}
+        {result.record_id && <Stat label="Record ID" value={result.record_id} />}
+      </div>
+
+      {result.alterations && (
+        <div className="flex flex-col gap-2">
+          <h4 className="text-lg font-semibold text-beige5">Alterations</h4>
+          <AlterationRow label="Visual" item={result.alterations.visually_altered} />
+          <AlterationRow label="Timing" item={result.alterations.time_altered} />
+          <AlterationRow label="Quality" item={result.alterations.quality_altered} />
+          <AlterationRow label="Audio" item={result.alterations.audio_altered} notChecked />
+        </div>
+      )}
+
+      {frames.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <h4 className="text-lg font-semibold text-beige5">Frame results</h4>
+          <div className="max-h-64 overflow-y-auto rounded-lg bg-beige1">
+            {frames.map((f, i) => (
+              <div
+                key={i}
+                className="flex items-center justify-between border-b border-gray2 px-4 py-2 text-sm text-beige5 last:border-b-0"
+              >
+                <span>{f.timestamp_sec}s</span>
+                <span>distance {f.distance}</span>
+                <span className={f.matched ? "text-green-700" : "text-red-700"}>
+                  {f.matched ? "Matched" : "Changed"}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Body({ page, isUploading, setIsUploading }: BodyProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadStatus, setUploadStatus] = useState("");
+
+  const [result, setResult] = useState<ApiResult | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -20,11 +169,13 @@ export default function Body({ page, isUploading, setIsUploading }: BodyProps) {
       setSelectedFile(e.target.files[0]);
       setUploadStatus("");
       setUploadProgress(0);
+      setResult(null);
     }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setResult(null);
 
     if (!selectedFile) {
       setUploadStatus("Please select a file first.");
@@ -57,7 +208,11 @@ export default function Body({ page, isUploading, setIsUploading }: BodyProps) {
       setIsUploading(false);
       if (xhr.status >= 200 && xhr.status < 300) {
         const result = JSON.parse(xhr.responseText);
-        setUploadStatus(`Success! Sampled ${result.total_frames_sampled} frames. (ID: ${result.record_id})`);
+        setResult(result);
+        setUploadStatus(page === "register"
+          ? `Success! Sampled ${result.total_frames_sampled} frames. (ID: ${result.record_id})`
+          : "Verification complete."
+        );
       } else if (xhr.status === 409) {
         const err = JSON.parse(xhr.responseText);
         setUploadStatus(err.detail || "This file has already been uploaded.");
@@ -149,6 +304,8 @@ export default function Body({ page, isUploading, setIsUploading }: BodyProps) {
               <p className="text-xs text-beige5/80">{uploadStatus}</p>
             )}
           </form>
+
+        {result && <ResultCard result={result} />}
         </div>
       </div>
     </section>
