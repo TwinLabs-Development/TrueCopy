@@ -1,3 +1,5 @@
+import { MdOutlineUpload } from "react-icons/md";
+
 export default function Body() {
   return (
     <main className="w-full px-4 py-8 sm:px-6 lg:px-8">
@@ -20,8 +22,8 @@ export default function Body() {
           </div>
 
           <div className="rounded-xl border-2 border-dashed border-speed/30 bg-gray-200 p-6 text-center transition hover:border-[#5b4837]/40 sm:p-10">
-            <div className="mx-auto flex max-w-xs cursor-pointer flex-col items-center justify-center rounded-lg bg-speed py-3 px-4 text-sm font-medium text-white shadow-sm hover:bg-speed/20 hover:text-speed transition">
-              Choose File
+            <div className="mx-auto flex flex-row gap-4 max-w-xs cursor-pointer items-center justify-center rounded-lg bg-speed py-3 px-4 text-sm font-medium text-white shadow-sm hover:bg-speed/20 hover:text-speed transition">
+              <MdOutlineUpload className="text-lg" /> Choose File
             </div>
           </div>
         </div>
