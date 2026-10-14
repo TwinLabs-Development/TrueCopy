@@ -1,11 +1,36 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,495;1,495&display=swap');
+
+html {
+  font-size: clamp(12px, calc(100vw / 120), 24px);
+}
 
 
 body {
-    background-color: #ececec;
+    font-family: 'Montserrat', sans-serif;
+    background-color: var(--color-beige3);
+    color: var(--color-beige5);
+
+    background-image: radial-gradient(var(--color-beige4) 0.125rem, transparent 0.0625rem);
+    background-size: 1.25rem 1.25rem;
+
+    margin: 0;
+    padding: 0;
 }
 
 @theme {
-    --color-wallahi: #ececec;
-    --color-speed: #5b4837;
+    /* MAIN COLOR PALETTE, 1-LIGHTEST 5-DARKEST */
+    --color-beige1: #ececec;
+    --color-beige2: #d6cfc7;
+    --color-beige3: #c0af9f;
+    --color-beige4: #aa8f7a;
+    --color-beige5: #5b4837;
+
+    /* FOR GREYED OUT AREAS */
+    --color-gray1: #D3D3D3;
+    --color-gray2: #BDB7B2;
+
+    --drop-shadow-glow: 0 0 1.25rem rgba(14, 11, 8, 0.25);
+
+    --font-sans: 'Montserrat', sans-serif;
 }

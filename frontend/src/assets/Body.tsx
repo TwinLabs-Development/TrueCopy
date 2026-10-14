@@ -68,10 +68,12 @@ export default function Body() {
   };
 
   return (
-    <main className="w-full px-4 py-8 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-4xl overflow-hidden rounded-2xl bg-white shadow-lg shadow-speed/10">
-        <div className="flex flex-col items-center justify-center gap-3 px-6 pt-8 pb-4 text-center sm:px-10 sm:pt-10">
-          <h1 className="text-3xl font-black tracking-tight text-speed sm:text-5xl md:text-6xl">
+    <main className="flex flex-col min-h-screen w-full max-w-7xl mx-auto">
+      {/* MAIN CONTAINER */}
+      <div className="drop-shadow-glow flex flex-col flex-1 bg-beige1 px-20 gap-20">
+        {/* SECTION 1 */}
+        <div className="flex flex-col items-center justify-center text-center">
+          <h1 className="py-10 text-[8rem] font-extrabold tracking-tight">
             TrueCopy
           </h1>
           <p className="max-w-xl text-sm leading-relaxed text-speed sm:text-base">
@@ -79,13 +81,10 @@ export default function Body() {
           </p>
         </div>
 
-        <div className="flex flex-col gap-6 px-4 py-6 sm:px-10 sm:pb-10">
-          <div>
-            <h2 className="text-xl font-bold text-speed sm:text-2xl">Register</h2>
-            <p className="text-xs text-speed/75 sm:text-sm">
-              Upload the original video to put into the database
-            </p>
-          </div>
+        {/* SECTION 2 */}
+        <div className="flex flex-col px-40 gap-6">
+          <h2 className="text-5xl font-semibold italic">Register</h2>
+          <p>Upload the original video to put into the database</p>
 
           <form onSubmit={handleSubmit} className="flex flex-col rounded-xl border-2 border-dashed border-speed/30 bg-gray-200 gap-4 p-6 text-center transition hover:border-[#5b4837]/40 sm:p-10">
             <input
