@@ -1,6 +1,7 @@
-MATCH_MAX = 10      # <= this: same picture (compression noise)
-TAMPER_MIN = 12     # > this: visually changed
-UNRELATED_MIN = 20  # avg bits apart; above this it's a different video
+MATCH_MAX = 10        # <= this: same picture (compression noise)
+TAMPER_MIN = 12       # > this: visually changed
+UNRELATED_MIN = 20    # avg bits apart; above this it's a different video
+CONSECUTIVE_MIN = 2   # min consecutive flagged frames to declare a spliced/tampered scene
 
 
 def best_alignment(orig, cand):
@@ -47,19 +48,50 @@ def compare(orig_meta, orig, cand_meta, cand):
         )
 
     frames = []
-    for (a, b), d in zip(pairs, dists):
-        d = int(d)  # NumPy int -> plain int
+    altered_segments = []
+    spike_start = None
+    spike_count = 0
+
+    for idx, ((a, b), d) in enumerate(zip(pairs, dists)):
+        d = int(d)
+        is_tampered = d > TAMPER_MIN
+        t_sec = f"{b['t_ms'] / 1000:.2f}"
+
         frames.append({
-        "timestamp_sec": float(round(b["t_ms"] / 1000, 2)),
-        "distance": d,
-        "matched": bool(d <= MATCH_MAX),
-        "frame_url": b["url"],
-    })
+            "timestamp_sec": t_sec,
+            "distance": d,
+            "matched": bool(d <= MATCH_MAX),
+            "frame_url": b.get("url", ""),
+        })
+
+        # Track consecutive tampered frames
+        if is_tampered:
+            if spike_count == 0:
+                spike_start = t_sec
+            spike_count += 1
+        else:
+            if spike_count >= CONSECUTIVE_MIN:
+                prev_t_sec = f"{pairs[idx - 1][1]['t_ms'] / 1000:.2f}"
+                altered_segments.append({
+                    "start": f"{spike_start}s",
+                    "end": f"{prev_t_sec}s",
+                    "frames_count": spike_count,
+                })
+            spike_count = 0
+
+    # Catch streak if video ends while still tampered
+    if spike_count >= CONSECUTIVE_MIN:
+        last_t_sec = f"{pairs[-1][1]['t_ms'] / 1000:.2f}"
+        altered_segments.append({
+            "start": f"{spike_start}s",
+            "end": f"{last_t_sec}s",
+            "frames_count": spike_count,
+        })
 
     flagged = [f for f in frames if f["distance"] > TAMPER_MIN]
     offset_s = float((pairs[0][0]["t_ms"] - pairs[0][1]["t_ms"]) / 1000)
     dur_delta = float(abs(orig_meta["duration_ms"] - cand_meta["duration_ms"]) / 1000)
-    time_altered = bool(dur_delta > 1.0 or abs(offset_s) > 0.5)  # plain bool
+    time_altered = bool(dur_delta > 1.0 or abs(offset_s) > 0.5)
 
     o_res = f'{orig_meta["width"]}x{orig_meta["height"]}'
     c_res = f'{cand_meta["width"]}x{cand_meta["height"]}'
@@ -76,8 +108,9 @@ def compare(orig_meta, orig, cand_meta, cand):
         "alterations": {
             "visually_altered": {
                 "detected": bool(flagged),
+                "segments": altered_segments,
                 "flagged_timestamps": [f'{f["timestamp_sec"]}s' for f in flagged],
-                "details": f"{len(flagged)} frame(s) showed visual tampering.",
+                "details": f"{len(flagged)} frame(s) showed visual tampering across {len(altered_segments)} segment(s).",
             },
             "time_altered": {
                 "detected": time_altered,
