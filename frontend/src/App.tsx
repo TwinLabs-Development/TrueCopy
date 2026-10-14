@@ -2,64 +2,22 @@ import './index.css';
 import { useState } from 'react';
 import Header from './assets/Header';
 import Body from './assets/Body';
+import Footer from './assets/Footer';
 
 function App() {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadStatus, setUploadStatus] = useState('');
-  const [frames, setFrames] = useState<string[]>([]);
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      setSelectedFile(e.target.files[0]);
-      setUploadStatus('');
-      setFrames([]);
-    }
-  };
-
-  const handleSubmit = async (e : React.FormEvent) => {
-    e.preventDefault();
-
-    if (!selectedFile) {
-      setUploadStatus('Please select a file first.');
-      return;
-    }
-
-    const formData = new FormData();
-    formData.append('file', selectedFile);
-
-    try {
-      setUploadStatus('Uploading and extracting frames...');
-      setIsUploading(true);
-
-      const response = await fetch('http://localhost:8000/video', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error(`Upload failed with status: ${response.status}`);
-      }
-
-      const result = await response.json();
-      setUploadStatus(`Success! Extracted ${result.frames.length} frames.`);
-      setFrames(result.frames);
-      console.log('Result: ', result);
-    } catch (error) {
-      console.error(error);
-      setUploadStatus('Upload failed. Check backend terminal for details.');
-    } finally {
-      setIsUploading(false);
-    }
-  };
+  
 
   return (
-    <>
-      <div className="flex flex-col gap-6">
-        <Header />
-        <Body />
-      </div>
-    </>
+    <div className="flex flex-col min-h-screen">
+    <Header />
+    
+    {/* The main tag wraps the body and stretches to fill empty space */}
+    <main className="grow">
+      <Body />
+    </main>
+    
+    <Footer />
+  </div>
   );
   //   <div className="flex flex-col justify-center items-center min-h-screen gap-4 p-4">
   //     <header className="text-center">

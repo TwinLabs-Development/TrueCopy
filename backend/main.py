@@ -20,6 +20,14 @@ VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv", ".webm", ".mpeg", ".mpg"}
 
 app = FastAPI()
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],  # Your Vite dev server
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 async def save_upload(file: UploadFile):
     suffix = Path(file.filename or "").suffix.lower()
     if suffix not in VIDEO_EXTENSIONS:
@@ -44,10 +52,20 @@ async def register(file: UploadFile = File(...)):
     path = None
     try:
         path, sha = await save_upload(file)
+
+        # Check if already registered
+        if sha in SHA_INDEX:
+            existing_id = SHA_INDEX[sha]
+            raise HTTPException(
+                status_code=409,  # 409 Conflict
+                detail=f"This video is already registered (Record ID: {existing_id})"
+            )
+
         meta, hashes = await asyncio.to_thread(process, path)
         record_id = uuid.uuid4().hex[:8]
         REGISTERED[record_id] = {"sha256": sha, "meta": meta, "hashes": hashes}
         SHA_INDEX[sha] = record_id
+
         return {
             "status": "Registered successfully",
             "record_id": record_id,
@@ -64,7 +82,6 @@ async def register(file: UploadFile = File(...)):
         await file.close()
         if path is not None:
             path.unlink(missing_ok=True)
-
 
 @app.post("/verify")
 async def verify(file: UploadFile = File(...), record_id: str | None = None):
