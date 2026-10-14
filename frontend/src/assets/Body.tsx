@@ -70,13 +70,13 @@ export default function Body() {
   return (
     <main className="flex flex-col min-h-screen w-full max-w-7xl mx-auto">
       {/* MAIN CONTAINER */}
-      <div className="drop-shadow-glow flex flex-col flex-1 bg-beige1 px-20 gap-20">
+      <div className="drop-shadow-glow flex flex-col flex-1 bg-beige1 px-[clamp(1rem,4vw,5rem)] gap-20">
         {/* SECTION 1 */}
         <div className="flex flex-col items-center justify-center text-center">
           <h1 className="py-10 text-[8rem] font-extrabold tracking-tight">
             TrueCopy
           </h1>
-          <p className="max-w-xl text-sm leading-relaxed text-speed sm:text-base">
+          <p className="max-w-xl text-sm leading-relaxed text-beige5 sm:text-base">
             Lorem ipsum garbage Lorem ipsum garbage Lorem ipsum garbage Lorem ipsum garbage Lorem ipsum garbage Lorem ipsum garbage
           </p>
         </div>
@@ -86,7 +86,7 @@ export default function Body() {
           <h2 className="text-5xl font-semibold italic">Register</h2>
           <p>Upload the original video to put into the database</p>
 
-          <form onSubmit={handleSubmit} className="flex flex-col rounded-xl border-2 border-dashed border-speed/30 bg-gray-200 gap-4 p-6 text-center transition hover:border-[#5b4837]/40 sm:p-10">
+          <form onSubmit={handleSubmit} className="relative left-1/2 -translate-x-1/2 flex w-[max(30rem,100%)] flex flex-col rounded-xl border-[0.3rem] border-dashed border-gray2 bg-gray1 gap-4 p-6 text-center transition hover:border-gray2/25">
             <input
               type="file"
               ref={fileInputRef}
@@ -105,7 +105,7 @@ export default function Body() {
 
             {selectedFile && (
               <>
-                <p className="text-xs text-speed font-medium">{selectedFile.name} ({(selectedFile.size / 1000000).toFixed(2)}MB)</p>
+                <p className="text-xs text-beige5 font-medium">{selectedFile.name} ({(selectedFile.size / 1000000).toFixed(2)}MB)</p>
                 <button
                   type="submit"
                   disabled={isUploading}
@@ -117,7 +117,7 @@ export default function Body() {
             )}
 
             {isUploading && (
-              <div className="relative overflow-hidden rounded-lg bg-wallahi py-2.5">
+              <div className="relative overflow-hidden rounded-lg bg-beige1 py-2.5">
                 <div
                   className="absolute inset-y-0 left-0 bg-green-600 transition-[width] duration-200 ease-out"
                   style={{ width: `${uploadProgress}%` }}
@@ -131,7 +131,7 @@ export default function Body() {
             )}
 
             {(!isUploading && uploadStatus) && (
-              <p className="text-xs text-speed/80">{uploadStatus}</p>
+              <p className="text-xs text-beige5/80">{uploadStatus}</p>
             )}
           </form>
         </div>
