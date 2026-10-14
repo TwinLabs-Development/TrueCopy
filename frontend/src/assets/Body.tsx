@@ -43,9 +43,9 @@ type ApiResult = {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex flex-col items-center rounded-lg bg-beige1 p-4">
+    <div className="flex min-w-0 flex-col items-center rounded-lg bg-beige1 p-4">
       <span className="text-xs text-beige5/80">{label}</span>
-      <span className="text-2xl font-bold text-beige5">{value}</span>
+      <span className="break-all text-center text-xl font-bold text-beige5 sm:text-2xl">{value}</span>
     </div>
   );
 }
@@ -233,10 +233,10 @@ export default function Body({ page, isUploading, setIsUploading }: BodyProps) {
   return (
     <section className="flex flex-col min-h-screen w-full max-w-7xl mx-auto">
       {/* MAIN CONTAINER */}
-      <div className="drop-shadow-glow flex flex-col flex-1 bg-beige1 px-[clamp(1rem,4vw,5rem)] gap-20">
+      <div className="drop-shadow-glow flex flex-col flex-1 bg-beige1 px-[clamp(1rem,4vw,5rem)] pb-16 gap-12 md:gap-20">
         {/* SECTION 1 */}
         <div className="flex flex-col items-center justify-center text-center">
-          <h1 className="py-10 text-[8rem] font-extrabold tracking-tight">
+          <h1 className="py-6 sm:py-10 text-[clamp(3rem,16vw,8rem)] font-extrabold tracking-tight">
             TrueCopy
           </h1>
           <p className="max-w-xl text-sm leading-relaxed text-beige5 sm:text-base">
@@ -245,8 +245,8 @@ export default function Body({ page, isUploading, setIsUploading }: BodyProps) {
         </div>
 
         {/* SECTION 2 */}
-        <div className="flex flex-col px-40 gap-6">
-          <h2 className="text-5xl font-semibold italic">
+        <div className="flex flex-col w-full px-0 sm:px-10 lg:px-40 gap-6">
+          <h2 className="text-3xl sm:text-5xl font-semibold italic">
             {page === "register" ? "Register" : "Verify"}
           </h2>
           <p>
@@ -255,7 +255,7 @@ export default function Body({ page, isUploading, setIsUploading }: BodyProps) {
               : "Upload a video to check against the database"}
           </p>
 
-          <form onSubmit={handleSubmit} className="relative left-1/2 -translate-x-1/2 flex w-[max(30rem,100%)] flex flex-col rounded-xl border-[0.3rem] border-dashed border-gray2 bg-gray1 gap-4 p-6 text-center transition hover:border-gray2/25">
+          <form onSubmit={handleSubmit} className="flex w-full flex-col rounded-xl border-[0.3rem] border-dashed border-gray2 bg-gray1 gap-4 p-4 sm:p-6 text-center transition hover:border-gray2/25">
             <input
               type="file"
               ref={fileInputRef}
