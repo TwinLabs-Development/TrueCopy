@@ -4,16 +4,20 @@ import Header from './assets/Header';
 import Body from './assets/Body';
 import Footer from './assets/Footer';
 
-function App() {
-  
+export default function App() {
+  const [page, setPage] = useState<"register" | "verify">("verify");
+  const [isUploading, setIsUploading] = useState(false);
+
+  // need to maybe make a login thingy to see who's eligible to register or not? GO THINGYEE, GO! (im so sorry bro im only a frontend merchant)
+  const canRegister = true;
 
   return (
     <div className="flex flex-col min-h-screen">
-    <Header />
+    <Header page={page} setPage={setPage} canRegister={canRegister} isUploading={isUploading}/>
     
     {/* The main tag wraps the body and stretches to fill empty space */}
     <main className="grow">
-      <Body />
+      <Body key={page} page={page} isUploading={isUploading} setIsUploading={setIsUploading}/>
     </main>
     
     <Footer />
@@ -76,5 +80,3 @@ function App() {
   //   </div>
   // );
 }
-
-export default App;
