@@ -13,12 +13,20 @@ import analyzer
 import fingerprint
 import frame_extract
 
-REGISTERED = {}  # record_id -> {sha256, meta, hashes}
-SHA_INDEX = {}   # sha256 -> record_id
+REGISTERED = {} 
+SHA_INDEX = {}  
 
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv", ".webm", ".mpeg", ".mpg"}
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"], 
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 async def save_upload(file: UploadFile):
     suffix = Path(file.filename or "").suffix.lower()
@@ -44,10 +52,31 @@ async def register(file: UploadFile = File(...)):
     path = None
     try:
         path, sha = await save_upload(file)
+
+        
+        if sha in SHA_INDEX:
+            existing_id = SHA_INDEX[sha]
+            raise HTTPException(
+                status_code=409,
+                detail=f"Duplicate video: exact file already registered (ID: {existing_id})"
+            )
+
+        
         meta, hashes = await asyncio.to_thread(process, path)
+
+        for existing_id, data in REGISTERED.items():
+            result = analyzer.compare(data["meta"], data["hashes"], meta, hashes)
+            # If perceptual similarity is high (e.g., >= 95% identical frames)
+            if result.get("overall_similarity", 0) >= 95:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Duplicate content: video matches existing record {existing_id} ({result['overall_similarity']}% similar)"
+                )
+
         record_id = uuid.uuid4().hex[:8]
         REGISTERED[record_id] = {"sha256": sha, "meta": meta, "hashes": hashes}
         SHA_INDEX[sha] = record_id
+
         return {
             "status": "Registered successfully",
             "record_id": record_id,
@@ -65,7 +94,6 @@ async def register(file: UploadFile = File(...)):
         if path is not None:
             path.unlink(missing_ok=True)
 
-
 @app.post("/verify")
 async def verify(file: UploadFile = File(...), record_id: str | None = None):
     path = None
@@ -77,12 +105,9 @@ async def verify(file: UploadFile = File(...), record_id: str | None = None):
 
         path, sha = await save_upload(file)
 
-        # Check 1: exact byte-for-byte match
         if sha == rec["sha256"]:
             return {"exact_match": True, "record_id": rec_id, "overall_similarity": 100,
                     "is_authentic": True, "alterations": {}, "frames": []}
-
-        # Check 2: perceptual comparison
         meta, hashes = await asyncio.to_thread(process, path)
         result = analyzer.compare(rec["meta"], rec["hashes"], meta, hashes)
         return {"exact_match": False, "record_id": rec_id, **result}
