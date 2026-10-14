@@ -12,9 +12,10 @@ def best_alignment(orig, cand):
         pairs = [(orig[j + shift], cand[j]) for j in range(m) if 0 <= j + shift < n]
         if len(pairs) < min_overlap:
             continue
-        avg = sum(a["hash"] - b["hash"] for a, b in pairs) / len(pairs)
+        dists = [a["hash"] - b["hash"] for a, b in pairs]
+        avg = sum(dists) / len(dists)
         if best is None or avg < best[0]:
-            best = (avg, pairs)
+            best = (avg, pairs, dists)
     return best
 
 
@@ -35,10 +36,10 @@ def compare(orig_meta, orig, cand_meta, cand):
     if best is None:
         return not_registered(64, "Not enough overlap with the registered video.")
 
-    avg, pairs = best
-    avg = float(avg)  # convert NumPy number to plain Python float
+    avg, pairs, dists = best
+    avg = float(avg)
 
-    matched_frac = sum(a["hash"] - b["hash"] <= MATCH_MAX for a, b in pairs) / len(pairs)
+    matched_frac = sum(d <= MATCH_MAX for d in dists) / len(dists)
     if avg > UNRELATED_MIN or matched_frac < 0.3:
         return not_registered(
             avg,
@@ -46,14 +47,14 @@ def compare(orig_meta, orig, cand_meta, cand):
         )
 
     frames = []
-    for a, b in pairs:
-        d = int(a["hash"]) - int(b["hash"])  # plain int
+    for (a, b), d in zip(pairs, dists):
+        d = int(d)  # NumPy int -> plain int
         frames.append({
-            "timestamp_sec": float(round(b["t_ms"] / 1000, 2)),
-            "distance": d,
-            "matched": bool(d <= MATCH_MAX),  # plain bool
-            "frame_url": b["url"],
-        })
+        "timestamp_sec": float(round(b["t_ms"] / 1000, 2)),
+        "distance": d,
+        "matched": bool(d <= MATCH_MAX),
+        "frame_url": b["url"],
+    })
 
     flagged = [f for f in frames if f["distance"] > TAMPER_MIN]
     offset_s = float((pairs[0][0]["t_ms"] - pairs[0][1]["t_ms"]) / 1000)
