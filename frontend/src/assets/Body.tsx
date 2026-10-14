@@ -98,14 +98,14 @@ export default function Body() {
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="mx-auto flex flex-row gap-4 max-w-xs cursor-pointer items-center justify-center rounded-lg bg-speed py-3 px-6 text-sm font-medium text-white shadow-sm hover:bg-speed/20 hover:text-speed transition"
+              className="bg-beige5 mx-auto flex flex-row gap-4 max-w-xs cursor-pointer items-center justify-center rounded-lg py-3 px-6 text-sm font-medium text-white shadow-sm hover:bg-beige5/20 hover:text-beige5 transition"
             >
               <MdOutlineUpload className="text-lg" /> Choose File
             </button>
 
             {selectedFile && (
               <>
-                <p className="text-xs text-speed font-medium">{selectedFile.name}</p>
+                <p className="text-xs text-speed font-medium">{selectedFile.name} ({(selectedFile.size / 1000000).toFixed(2)}MB)</p>
                 <button
                   type="submit"
                   disabled={isUploading}
