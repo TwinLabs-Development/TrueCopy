@@ -98,16 +98,25 @@ async def register(file: UploadFile = File(...)):
 async def verify(file: UploadFile = File(...), record_id: str | None = None):
     path = None
     try:
+        path, sha = await save_upload(file)
+
+        # note from diego - i have no idea what any of this means, i dont think it broke anything though
+
+        # Exact-match check. SHA_INDEX maps the SHA-256 of every registered file to its
+        # record ID, so this finds the record for an identical file no matter when it was
+        # registered. The default lookup below only checks the most recent registration.
+
+        # If this exact file was registered at any point, return that record
+        if sha in SHA_INDEX:
+            rec_id = SHA_INDEX[sha]
+            return {"exact_match": True, "record_id": rec_id, "overall_similarity": 100,
+                    "is_authentic": True, "alterations": {}, "frames": []}
+
         rec_id = record_id or next(reversed(REGISTERED), None)
         if rec_id is None or rec_id not in REGISTERED:
             raise HTTPException(status_code=404, detail="No registered original found")
         rec = REGISTERED[rec_id]
 
-        path, sha = await save_upload(file)
-
-        if sha == rec["sha256"]:
-            return {"exact_match": True, "record_id": rec_id, "overall_similarity": 100,
-                    "is_authentic": True, "alterations": {}, "frames": []}
         meta, hashes = await asyncio.to_thread(process, path)
         result = analyzer.compare(rec["meta"], rec["hashes"], meta, hashes)
         return {"exact_match": False, "record_id": rec_id, **result}
