@@ -1,6 +1,18 @@
 import logo from "./book.svg";
 
-export default function Header() {
+type Page = "register" | "verify";
+
+type HeaderProps = {
+  page: Page;
+  setPage: (page: Page) => void;
+  canRegister: boolean;
+  isUploading: boolean;
+};
+
+export default function Header({page, setPage, canRegister, isUploading}: HeaderProps) {
+  const buttonBase =
+    "cursor-pointer transition-all duration-300 ease-out hover:scale-110 hover:opacity-80 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100 disabled:hover:opacity-40";
+  
   return (
     <>
       <header className="drop-shadow-lg bg-beige5 text-beige1 p-6">
@@ -15,18 +27,19 @@ export default function Header() {
 
           {/* RIGHT SIDE */}
           <div className="justify-end flex flex-row text-xl items-center gap-12 font-medium">
-            <button
-              type="button"
-              className="cursor-pointer transition-all duration-300 ease-out hover:scale-110 hover:opacity-80 active:scale-95"
-            >
-              {/* placeholders, idk why i put an anchor tag, just incase it switches tabs? */}
-              <a href="#">Verify</a>
+          <button
+            type="button"
+            onClick={() => setPage("verify")}
+            disabled={isUploading}
+            className={`${buttonBase} ${page === "verify" ? "underline underline-offset-8" : ""}`}>
+              Verify
             </button>
-            <button
-              type="button"
-              className="cursor-pointer transition-all duration-300 ease-out hover:scale-110 hover:opacity-80 active:scale-95"
-            >
-              <a href="#">Register</a>
+          <button
+            type="button"
+            onClick={() => setPage("register")}
+            disabled={!canRegister || isUploading}
+            className={`${buttonBase} ${page === "register" ? "underline underline-offset-8" : ""}`}>
+              Register
             </button>
           </div>
         </div>
