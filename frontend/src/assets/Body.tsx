@@ -112,7 +112,8 @@ export default function Body({ page, isUploading, setIsUploading }: BodyProps) {
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="bg-beige5 mx-auto flex flex-row gap-4 max-w-xs cursor-pointer items-center justify-center rounded-lg py-3 px-6 text-sm font-medium text-white shadow-sm hover:bg-beige5/20 hover:text-beige5 transition"
+              disabled={isUploading}
+              className="bg-beige5 mx-auto flex flex-row gap-4 max-w-xs cursor-pointer items-center justify-center rounded-lg py-3 px-6 text-sm font-medium text-white shadow-sm hover:bg-beige5/20 hover:text-beige5 transition disabled:cursor-not-allowed disabled:bg-gray2 disabled:text-beige5 disabled:shadow-none disabled:hover:bg-gray2 disabled:hover:text-beige5"
             >
               <MdOutlineUpload className="text-lg" /> Choose File
             </button>
