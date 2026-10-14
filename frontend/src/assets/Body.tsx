@@ -1,9 +1,16 @@
 import { MdOutlineUpload } from "react-icons/md";
 import { useState, useRef } from "react";
 
-export default function Body() {
+type Page = "register" | "verify";
+
+type BodyProps = {
+  page: Page;
+  isUploading: boolean;
+  setIsUploading: (value: boolean) => void;
+};
+
+export default function Body({ page, isUploading, setIsUploading }: BodyProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadStatus, setUploadStatus] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -31,8 +38,9 @@ export default function Body() {
     setUploadProgress(0);
     setUploadStatus("Uploading...");
 
+    const endpoint = page === "register" ? "/register" : "/verify";
     const xhr = new XMLHttpRequest();
-    xhr.open("POST", "http://localhost:8000/register");
+    xhr.open("POST", `http://localhost:8000${endpoint}`);
 
     // Tracks actual network bytes sent
     xhr.upload.onprogress = (event) => {
@@ -68,7 +76,7 @@ export default function Body() {
   };
 
   return (
-    <main className="flex flex-col min-h-screen w-full max-w-7xl mx-auto">
+    <section className="flex flex-col min-h-screen w-full max-w-7xl mx-auto">
       {/* MAIN CONTAINER */}
       <div className="drop-shadow-glow flex flex-col flex-1 bg-beige1 px-[clamp(1rem,4vw,5rem)] gap-20">
         {/* SECTION 1 */}
@@ -83,8 +91,14 @@ export default function Body() {
 
         {/* SECTION 2 */}
         <div className="flex flex-col px-40 gap-6">
-          <h2 className="text-5xl font-semibold italic">Register</h2>
-          <p>Upload the original video to put into the database</p>
+          <h2 className="text-5xl font-semibold italic">
+            {page === "register" ? "Register" : "Verify"}
+          </h2>
+          <p>
+            {page === "register"
+              ? "Upload the original video to put into the database"
+              : "Upload a video to check against the database"}
+          </p>
 
           <form onSubmit={handleSubmit} className="relative left-1/2 -translate-x-1/2 flex w-[max(30rem,100%)] flex flex-col rounded-xl border-[0.3rem] border-dashed border-gray2 bg-gray1 gap-4 p-6 text-center transition hover:border-gray2/25">
             <input
@@ -136,6 +150,6 @@ export default function Body() {
           </form>
         </div>
       </div>
-    </main>
+    </section>
   );
 }
