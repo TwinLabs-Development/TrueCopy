@@ -36,6 +36,8 @@ def compare(orig_meta, orig, cand_meta, cand):
         return not_registered(64, "Not enough overlap with the registered video.")
 
     avg, pairs = best
+    avg = float(avg)  # convert NumPy number to plain Python float
+
     matched_frac = sum(a["hash"] - b["hash"] <= MATCH_MAX for a, b in pairs) / len(pairs)
     if avg > UNRELATED_MIN or matched_frac < 0.3:
         return not_registered(
@@ -45,18 +47,18 @@ def compare(orig_meta, orig, cand_meta, cand):
 
     frames = []
     for a, b in pairs:
-        d = a["hash"] - b["hash"]
+        d = int(a["hash"]) - int(b["hash"])  # plain int
         frames.append({
-            "timestamp_sec": round(b["t_ms"] / 1000, 2),
+            "timestamp_sec": float(round(b["t_ms"] / 1000, 2)),
             "distance": d,
-            "matched": d <= MATCH_MAX,
+            "matched": bool(d <= MATCH_MAX),  # plain bool
             "frame_url": b["url"],
         })
 
     flagged = [f for f in frames if f["distance"] > TAMPER_MIN]
-    offset_s = (pairs[0][0]["t_ms"] - pairs[0][1]["t_ms"]) / 1000
-    dur_delta = abs(orig_meta["duration_ms"] - cand_meta["duration_ms"]) / 1000
-    time_altered = dur_delta > 1.0 or abs(offset_s) > 0.5
+    offset_s = float((pairs[0][0]["t_ms"] - pairs[0][1]["t_ms"]) / 1000)
+    dur_delta = float(abs(orig_meta["duration_ms"] - cand_meta["duration_ms"]) / 1000)
+    time_altered = bool(dur_delta > 1.0 or abs(offset_s) > 0.5)  # plain bool
 
     o_res = f'{orig_meta["width"]}x{orig_meta["height"]}'
     c_res = f'{cand_meta["width"]}x{cand_meta["height"]}'
