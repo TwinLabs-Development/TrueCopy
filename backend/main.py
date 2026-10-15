@@ -7,14 +7,13 @@ import uuid
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 
 import analyzer
 import fingerprint
 import frame_extract
 
-REGISTERED = {} 
-SHA_INDEX = {}  
+REGISTERED = {}  # record_id -> {sha256, meta, hashes}
+SHA_INDEX = {}   # sha256 -> record_id
 
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv", ".webm", ".mpeg", ".mpg"}
 
@@ -22,29 +21,33 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"], 
+    allow_origins=["http://localhost:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+
 async def save_upload(file: UploadFile):
     suffix = Path(file.filename or "").suffix.lower()
     if suffix not in VIDEO_EXTENSIONS:
-        raise HTTPException(status_code=400, detail="Unsupported video file type")
+        raise HTTPException(status_code=400, detail=f"Unsupported format: '{suffix}'")
+
     sha = hashlib.sha256()
     with NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
         path = Path(tmp.name)
         while chunk := await file.read(1024 * 1024):
             tmp.write(chunk)
             sha.update(chunk)
+
     return path, sha.hexdigest()
 
 
 def process(path: Path):
     meta = fingerprint.get_meta(str(path))
     urls = frame_extract.extract_frames(str(path))
-    return meta, fingerprint.hash_frames(urls)
+    hashes = fingerprint.hash_frames(urls)
+    return meta, hashes
 
 
 @app.post("/register")
@@ -53,24 +56,28 @@ async def register(file: UploadFile = File(...)):
     try:
         path, sha = await save_upload(file)
 
-        
+        # 1. Exact byte duplicate rejection
         if sha in SHA_INDEX:
             existing_id = SHA_INDEX[sha]
             raise HTTPException(
                 status_code=409,
-                detail=f"Duplicate video: exact file already registered (ID: {existing_id})"
+                detail=f"Video already registered with Record ID: {existing_id}",
             )
 
-        
         meta, hashes = await asyncio.to_thread(process, path)
 
-        for existing_id, data in REGISTERED.items():
-            result = analyzer.compare(data["meta"], data["hashes"], meta, hashes)
-            # If perceptual similarity is high (e.g., >= 95% identical frames)
-            if result.get("overall_similarity", 0) >= 95:
+        if not hashes:
+            raise HTTPException(status_code=422, detail="Failed to extract readable frames from video.")
+
+        # 2. Perceptual duplicate check
+        for rec_id, rec in REGISTERED.items():
+            result = analyzer.compare(rec["meta"], rec["hashes"], meta, hashes)
+            if result.get("overall_similarity", 0) >= 98.0 and not result.get("is_authentic", False):
+                pass
+            elif result.get("overall_similarity", 0) >= 99.0:
                 raise HTTPException(
                     status_code=409,
-                    detail=f"Duplicate content: video matches existing record {existing_id} ({result['overall_similarity']}% similar)"
+                    detail=f"Perceptual duplicate of registered record '{rec_id}' ({result['overall_similarity']}% similarity).",
                 )
 
         record_id = uuid.uuid4().hex[:8]
@@ -88,43 +95,76 @@ async def register(file: UploadFile = File(...)):
         raise
     except Exception as exc:
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail="Registration failed") from exc
+        raise HTTPException(status_code=500, detail="Internal registration failure.") from exc
     finally:
         await file.close()
         if path is not None:
             path.unlink(missing_ok=True)
 
+
 @app.post("/verify")
 async def verify(file: UploadFile = File(...), record_id: str | None = None):
     path = None
     try:
+        if not REGISTERED:
+            raise HTTPException(status_code=404, detail="No registered baseline videos found.")
+
         path, sha = await save_upload(file)
 
-        # note from diego - i have no idea what any of this means, i dont think it broke anything though
-
-        # Exact-match check. SHA_INDEX maps the SHA-256 of every registered file to its
-        # record ID, so this finds the record for an identical file no matter when it was
-        # registered. The default lookup below only checks the most recent registration.
-
-        # If this exact file was registered at any point, return that record
+        # 1. Fast byte-level exact check
         if sha in SHA_INDEX:
-            rec_id = SHA_INDEX[sha]
-            return {"exact_match": True, "record_id": rec_id, "overall_similarity": 100,
-                    "is_authentic": True, "alterations": {}, "frames": []}
+            matched_id = SHA_INDEX[sha]
+            return {
+                "exact_match": True,
+                "record_id": matched_id,
+                "verdict": "authentic",
+                "overall_similarity": 100.0,
+                "is_authentic": True,
+                "alterations": {
+                    "visually_altered": {"detected": False, "segments": [], "flagged_timestamps": [], "details": "Byte-identical."},
+                    "time_altered": {"detected": False, "details": "Byte-identical."},
+                    "quality_altered": {"detected": False, "details": "Byte-identical."},
+                    "audio_altered": {"detected": False, "details": "Byte-identical."},
+                },
+                "frames": [],
+                "message": "Exact byte-for-byte duplicate of registered master.",
+            }
 
-        rec_id = record_id or next(reversed(REGISTERED), None)
-        if rec_id is None or rec_id not in REGISTERED:
-            raise HTTPException(status_code=404, detail="No registered original found")
-        rec = REGISTERED[rec_id]
+        # 2. Select matching scope
+        if record_id:
+            if record_id not in REGISTERED:
+                raise HTTPException(status_code=404, detail=f"Record ID '{record_id}' not found.")
+            target_records = {record_id: REGISTERED[record_id]}
+        else:
+            target_records = REGISTERED
 
+        # 3. Extract & compare
         meta, hashes = await asyncio.to_thread(process, path)
-        result = analyzer.compare(rec["meta"], rec["hashes"], meta, hashes)
-        return {"exact_match": False, "record_id": rec_id, **result}
+        if not hashes:
+            raise HTTPException(status_code=422, detail="Failed to sample video frames.")
+
+        best_match_id = None
+        best_result = None
+        highest_similarity = -1.0
+
+        for r_id, rec in target_records.items():
+            result = analyzer.compare(rec["meta"], rec["hashes"], meta, hashes)
+            sim = result.get("overall_similarity", 0.0)
+            if sim > highest_similarity:
+                highest_similarity = sim
+                best_match_id = r_id
+                best_result = result
+
+        return {
+            "exact_match": False,
+            "record_id": best_match_id,
+            **best_result,
+        }
     except HTTPException:
         raise
     except Exception as exc:
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail="Verification failed") from exc
+        raise HTTPException(status_code=500, detail="Verification analysis failed.") from exc
     finally:
         await file.close()
         if path is not None:
