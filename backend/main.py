@@ -72,9 +72,7 @@ async def register(file: UploadFile = File(...)):
         # 2. Perceptual duplicate check
         for rec_id, rec in REGISTERED.items():
             result = analyzer.compare(rec["meta"], rec["hashes"], meta, hashes)
-            if result.get("overall_similarity", 0) >= 98.0 and not result.get("is_authentic", False):
-                pass
-            elif result.get("overall_similarity", 0) >= 99.0:
+            if result.get("overall_similarity", 0) >= 99.0:
                 raise HTTPException(
                     status_code=409,
                     detail=f"Perceptual duplicate of registered record '{rec_id}' ({result['overall_similarity']}% similarity).",

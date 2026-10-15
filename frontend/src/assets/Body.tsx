@@ -9,16 +9,25 @@ type BodyProps = {
   setIsUploading: (value: boolean) => void;
 };
 
+type Segment = {
+  start: string;
+  end: string;
+  frames_count: number;
+};
+
 type Alteration = {
   detected: boolean;
   details: string;
+  segments?: Segment[];
   flagged_timestamps?: string[];
 };
 
 type Frame = {
-  timestamp_sec: number;
+  timestamp_sec: string | number;
   distance: number;
+  audio_distance?: number;
   matched: boolean;
+  audio_matched?: boolean;
   frame_url: string;
 };
 
@@ -97,6 +106,7 @@ function ResultCard({ result }: { result: ApiResult }) {
   const headline = getHeadline(result);
   const frames = result.frames ?? [];
   const matchedCount = frames.filter((f) => f.matched).length;
+  const unlinked = result.verdict === "not_registered";
 
   return (
     <div className="flex flex-col gap-4 rounded-xl bg-gray1 border-[0.3rem] border-gray2 border-dashed p-6">
@@ -127,8 +137,8 @@ function ResultCard({ result }: { result: ApiResult }) {
           <h4 className="text-lg font-semibold text-beige5">Alterations</h4>
           <AlterationRow label="Visual" item={result.alterations.visually_altered} />
           <AlterationRow label="Timing" item={result.alterations.time_altered} />
-          <AlterationRow label="Quality" item={result.alterations.quality_altered} />
-          <AlterationRow label="Audio" item={result.alterations.audio_altered} notChecked />
+          <AlterationRow label="Quality" item={result.alterations.quality_altered} notChecked={unlinked} />
+          <AlterationRow label="Audio" item={result.alterations.audio_altered} notChecked={unlinked} />
         </div>
       )}
 
@@ -142,9 +152,12 @@ function ResultCard({ result }: { result: ApiResult }) {
                 className="flex items-center justify-between border-b border-gray2 px-4 py-2 text-sm text-beige5 last:border-b-0"
               >
                 <span>{f.timestamp_sec}s</span>
-                <span>distance {f.distance}</span>
-                <span className={f.matched ? "text-green-700" : "text-red-700"}>
-                  {f.matched ? "Matched" : "Changed"}
+                <span>
+                  visual {f.distance}
+                  {f.audio_distance !== undefined ? ` | audio ${f.audio_distance}` : ""}
+                </span>
+                <span className={f.matched && (f.audio_matched ?? true) ? "text-green-700" : "text-red-700"}>
+                  {f.matched && (f.audio_matched ?? true) ? "Matched" : "Changed"}
                 </span>
               </div>
             ))}
@@ -213,18 +226,28 @@ export default function Body({ page, isUploading, setIsUploading }: BodyProps) {
           ? `Success! Sampled ${result.total_frames_sampled} frames. (ID: ${result.record_id})`
           : "Verification complete."
         );
-      } else if (xhr.status === 409) {
-        const err = JSON.parse(xhr.responseText);
-        setUploadStatus(err.detail || "This file has already been uploaded.");
       } else {
-        setUploadStatus(`Upload failed with status: ${xhr.status}`);
+        let detail = `Upload failed with status: ${xhr.status}`;
+        try {
+          const err = JSON.parse(xhr.responseText);
+          if (err?.detail) detail = err.detail;
+        } catch {
+          // fallback to status message
+        }
+        setUploadStatus(detail);
       }
       setSelectedFile(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
     };
 
     xhr.onerror = () => {
       setIsUploading(false);
       setUploadStatus("Upload failed. Check backend terminal for details.");
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
     };
 
     xhr.send(formData);
@@ -240,7 +263,7 @@ export default function Body({ page, isUploading, setIsUploading }: BodyProps) {
             TrueCopy
           </h1>
           <p className="max-w-xl text-sm leading-relaxed text-beige5 sm:text-base">
-            Lorem ipsum garbage Lorem ipsum garbage Lorem ipsum garbage Lorem ipsum garbage Lorem ipsum garbage Lorem ipsum garbage
+            Perceptual video &amp; audio authenticity verification against registered originals.
           </p>
         </div>
 
@@ -260,7 +283,7 @@ export default function Body({ page, isUploading, setIsUploading }: BodyProps) {
               type="file"
               ref={fileInputRef}
               onChange={handleFileChange}
-              accept="video/*"
+              accept=".mp4,.mov,.avi,.mkv,.webm,.mpeg,.mpg,video/*"
               className="hidden"
             />
 

@@ -1,9 +1,39 @@
+import numpy as np
+
 MATCH_MAX = 10          # Compression noise ceiling
 TAMPER_MIN = 12         # Macro visual tamper limit
 TILE_TAMPER_LIMIT = 8   # Localized 3x3 quadrant tamper limit
+AUDIO_TAMPER_MIN = 14   # Per-window 64-bit audio hash tamper limit
 UNRELATED_MIN = 20      # Divergence ceiling before declaring unlinked
 CONSECUTIVE_MIN = 2     # Minimum streak to record a segment
 MAX_GAP_FRAMES = 1      # Allow up to 1 normal frame between anomalies before breaking streak
+
+
+def audio_distance(a_fp: dict | None, b_fp: dict | None) -> int:
+    """Computes phase-tolerant Hamming distance (0..64) between two audio window fingerprints."""
+    if not a_fp or not b_fp:
+        return 0
+    a_has = bool(a_fp.get("has_audio", False))
+    b_has = bool(b_fp.get("has_audio", False))
+    if not a_has and not b_has:
+        return 0
+    if a_has != b_has:
+        return 64
+
+    a_silent = bool(a_fp.get("silent", False))
+    b_silent = bool(b_fp.get("silent", False))
+    if a_silent and b_silent:
+        return 0
+    if a_silent != b_silent:
+        return 64
+
+    a_bits = a_fp.get("bits")
+    b_bits = b_fp.get("bits")
+    if a_bits is None or b_bits is None:
+        return 0
+
+    b_shifts = b_fp.get("shifted_bits") or [b_bits]
+    return min(int(np.count_nonzero(a_bits != b_s)) for b_s in b_shifts)
 
 
 def best_alignment(orig, cand):
@@ -51,7 +81,12 @@ def not_registered(avg, message, dur_delta=0.0):
                 "detected": False,
                 "details": "Cannot verify resolution on unlinked video.",
             },
-            "audio_altered": {"detected": False, "details": "Audio check not implemented."},
+            "audio_altered": {
+                "detected": False,
+                "segments": [],
+                "flagged_timestamps": [],
+                "details": "Cannot verify audio on unlinked video.",
+            },
         },
         "frames": [],
         "message": message,
@@ -83,12 +118,22 @@ def compare(orig_meta, orig, cand_meta, cand):
     flagged = []
     altered_segments = []
 
-    # Streak state with gap tolerance
+    # Visual streak state with gap tolerance
     streak_active = False
     streak_start = None
     streak_last = None
     tampered_frame_count = 0
     current_gap = 0
+
+    # Audio streak state with gap tolerance
+    audio_dists = []
+    audio_flagged = []
+    audio_segments = []
+    a_streak_active = False
+    a_streak_start = None
+    a_streak_last = None
+    a_tampered_count = 0
+    a_current_gap = 0
 
     for (a, b), global_d in zip(pairs, dists):
         global_d = int(global_d)
@@ -102,11 +147,18 @@ def compare(orig_meta, orig, cand_meta, cand):
         is_tampered = (global_d > TAMPER_MIN) or (max_tile_dist > TILE_TAMPER_LIMIT)
         t_sec = f"{b['t_ms'] / 1000:.2f}"
 
+        # Audio window comparison
+        a_dist = audio_distance(a.get("audio_fp"), b.get("audio_fp"))
+        audio_dists.append(a_dist)
+        is_audio_tampered = a_dist > AUDIO_TAMPER_MIN
+
         frame_data = {
             "timestamp_sec": t_sec,
             "distance": global_d,
             "max_tile_distance": max_tile_dist,
+            "audio_distance": a_dist,
             "matched": not is_tampered,
+            "audio_matched": not is_audio_tampered,
             "frame_url": b.get("url", ""),
         }
         frames.append(frame_data)
@@ -122,7 +174,6 @@ def compare(orig_meta, orig, cand_meta, cand):
         else:
             if streak_active:
                 current_gap += 1
-                # If gap exceeds tolerance, seal the current segment
                 if current_gap > MAX_GAP_FRAMES:
                     if tampered_frame_count >= CONSECUTIVE_MIN:
                         altered_segments.append({
@@ -136,12 +187,44 @@ def compare(orig_meta, orig, cand_meta, cand):
                     tampered_frame_count = 0
                     current_gap = 0
 
-    # Catch trailing streak
+        if is_audio_tampered:
+            audio_flagged.append(frame_data)
+            a_tampered_count += 1
+            a_current_gap = 0
+            if not a_streak_active:
+                a_streak_active = True
+                a_streak_start = t_sec
+            a_streak_last = t_sec
+        else:
+            if a_streak_active:
+                a_current_gap += 1
+                if a_current_gap > MAX_GAP_FRAMES:
+                    if a_tampered_count >= CONSECUTIVE_MIN:
+                        audio_segments.append({
+                            "start": f"{a_streak_start}s",
+                            "end": f"{a_streak_last}s",
+                            "frames_count": a_tampered_count,
+                        })
+                    a_streak_active = False
+                    a_streak_start = None
+                    a_streak_last = None
+                    a_tampered_count = 0
+                    a_current_gap = 0
+
+    # Catch trailing visual streak
     if streak_active and tampered_frame_count >= CONSECUTIVE_MIN:
         altered_segments.append({
             "start": f"{streak_start}s",
             "end": f"{streak_last}s",
             "frames_count": tampered_frame_count,
+        })
+
+    # Catch trailing audio streak
+    if a_streak_active and a_tampered_count >= CONSECUTIVE_MIN:
+        audio_segments.append({
+            "start": f"{a_streak_start}s",
+            "end": f"{a_streak_last}s",
+            "frames_count": a_tampered_count,
         })
 
     offset_s = float((pairs[0][0]["t_ms"] - pairs[0][1]["t_ms"]) / 1000) if pairs else 0.0
@@ -151,8 +234,43 @@ def compare(orig_meta, orig, cand_meta, cand):
     c_res = f'{cand_meta.get("width", 0)}x{cand_meta.get("height", 0)}'
     quality_altered = bool(o_res != c_res)
 
+    # Evaluate audio tampering across full track and localized segments
+    orig_has_audio = orig_meta.get("has_audio", True)
+    cand_has_audio = cand_meta.get("has_audio", True)
+    avg_audio_dist = float(sum(audio_dists) / len(audio_dists)) if audio_dists else 0.0
+    audio_flagged_frac = (len(audio_flagged) / len(pairs)) if pairs else 0.0
+
+    if orig_has_audio and not cand_has_audio:
+        audio_altered = True
+        audio_details = "Audio track missing or muted compared to baseline."
+    elif not orig_has_audio and cand_has_audio:
+        audio_altered = True
+        audio_details = "Unexpected audio track added to silent baseline."
+    elif not orig_has_audio and not cand_has_audio:
+        audio_altered = False
+        audio_details = "No audio stream in baseline or candidate."
+    elif audio_flagged_frac >= 0.5:
+        audio_altered = True
+        audio_details = (
+            f"Audio track swapped or replaced ({len(audio_flagged)}/{len(pairs)} windows altered, "
+            f"avg distance: {avg_audio_dist:.1f})."
+        )
+    elif len(audio_segments) > 0:
+        audio_altered = True
+        audio_details = (
+            f"{len(audio_flagged)} audio window(s) altered across {len(audio_segments)} segment(s)."
+        )
+    else:
+        audio_altered = False
+        audio_details = "Audio matches baseline."
+
     similarity = round(max(0.0, 100 - (avg / 64) * 100), 1)
-    is_authentic = len(flagged) == 0 and not time_altered and not quality_altered
+    is_authentic = (
+        len(flagged) == 0
+        and not time_altered
+        and not quality_altered
+        and not audio_altered
+    )
 
     return {
         "verdict": "authentic" if is_authentic else "altered",
@@ -178,7 +296,12 @@ def compare(orig_meta, orig, cand_meta, cand):
                 "detected": quality_altered,
                 "details": f"Resolution scaled: {o_res} -> {c_res}." if quality_altered else "Native resolution intact.",
             },
-            "audio_altered": {"detected": False, "details": "Audio check not implemented."},
+            "audio_altered": {
+                "detected": audio_altered,
+                "segments": audio_segments,
+                "flagged_timestamps": [f'{f["timestamp_sec"]}s' for f in audio_flagged],
+                "details": audio_details,
+            },
         },
         "frames": frames,
     }
