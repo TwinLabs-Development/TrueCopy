@@ -1,5 +1,5 @@
 # TrueCopy
-<img src="https://raw.githubusercontent.com/TwinLabs-Development/TrueCopy/refs/heads/main/TrueCopy.svg" width="350"></img>
+<a href="https://github.com/TwinLabs-Development/TwinLabs"><img src="https://raw.githubusercontent.com/TwinLabs-Development/TrueCopy/refs/heads/main/TrueCopy.svg" width="350"></img></a>
 
 [![Last Commit](https://img.shields.io/github/last-commit/TwinLabs-Development/TrueCopy/main)](https://github.com/TwinLabs-Development/TrueCopy/commits/main)
 [![GPLv3 License](https://img.shields.io/badge/License-GPL%20v3-yellow.svg)](https://opensource.org/licenses/)
