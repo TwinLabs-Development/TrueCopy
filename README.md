@@ -1,4 +1,7 @@
 # TrueCopy
+<img src="https://raw.githubusercontent.com/TwinLabs-Development/TrueCopy/refs/heads/main/TrueCopy.svg" width="350"></img>
+
+[![Last Commit](https://img.shields.io/github/last-commit/TwinLabs-Development/TrueCopy/main)](https://github.com/TwinLabs-Development/TrueCopy/commits/main)
 [![GPLv3 License](https://img.shields.io/badge/License-GPL%20v3-yellow.svg)](https://opensource.org/licenses/)
 
 TrueCopy is a tool that checks if a video or its audio has been edited, trimmed, or tampered with. 
@@ -49,7 +52,7 @@ pip install fastapi uvicorn opencv-python numpy pillow imagehash imageio-ffmpeg
 ```
 Start the backend server:
 ```bash
-uvicorn main:main --reload --port 8000
+uvicorn main:main --reload
 ```
 
 ### 2. Start the Frontend (Web App)

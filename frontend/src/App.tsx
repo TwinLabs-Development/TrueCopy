@@ -9,6 +9,7 @@ export default function App() {
   const [isUploading, setIsUploading] = useState(false);
 
   // need to maybe make a login thingy to see who's eligible to register or not? GO THINGYEE, GO! (im so sorry bro im only a frontend merchant)
+  // maybe we could prob do that later on cuz we dont have much time for hackathon rip </3
   const canRegister = true;
 
   return (
@@ -25,6 +26,7 @@ export default function App() {
   );
 
   // yo wtf is this? vvvvv -diego
+  // some old ahh code that i moved to body.tsx - nhue
 
   //   <div className="flex flex-col justify-center items-center min-h-screen gap-4 p-4">
   //     <header className="text-center">
